@@ -227,6 +227,7 @@ private:
 	unsigned	_num_failsafe_set;
 	unsigned	_num_disarmed_set;
 	bool		_safety_off;
+	uint8_t		_safety_options;
 	bool		_safety_disabled;
 	orb_advert_t	_to_safety;
 	bool		_oneshot_mode;
@@ -325,6 +326,22 @@ const PX4FMU::GPIOConfig PX4FMU::_gpio_tab[] = {
 	{0,                      GPIO_VDD_3V3_SENSORS_EN, 0},
 	{GPIO_VDD_BRICK_VALID,   0,                       0},
 #endif
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
+	{GPIO_GPIO0_INPUT,       GPIO_GPIO0_OUTPUT,       0},
+	{GPIO_GPIO1_INPUT,       GPIO_GPIO1_OUTPUT,       0},
+	{GPIO_GPIO2_INPUT,       GPIO_GPIO2_OUTPUT,       0},
+	{GPIO_GPIO3_INPUT,       GPIO_GPIO3_OUTPUT,       0},
+	{GPIO_GPIO4_INPUT,       GPIO_GPIO4_OUTPUT,       0},
+	{GPIO_GPIO5_INPUT,       GPIO_GPIO5_OUTPUT,       0},
+	
+	{0,                      GPIO_VDD_3V3_SENSORS_EN, 0},
+	{0,                      GPIO_VDD_3V3_PERIPH_EN,  0},
+	{GPIO_VDD_BRICK_VALID,   0,                       0},
+	{GPIO_VDD_BRICK2_VALID,  0,                       0},
+	{GPIO_VBUS_VALID,        0,                       0},
+	{GPIO_VDD_5V_HIPOWER_OC, 0,                       0},
+	{GPIO_VDD_5V_PERIPH_OC,  0,                       0},
+#endif
 #if defined(CONFIG_ARCH_BOARD_AEROCORE)
 	/* AeroCore breaks out User GPIOs on J11 */
 	{GPIO_GPIO0_INPUT,       GPIO_GPIO0_OUTPUT,       0},
@@ -355,7 +372,7 @@ const PX4FMU::GPIOConfig PX4FMU::_gpio_tab[] = {
 	{GPIO_GPIO12_INPUT,      GPIO_GPIO12_OUTPUT,       0},
 	{0,       0,       0},
 #endif
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10)
 	{GPIO_GPIO0_INPUT,       GPIO_GPIO0_OUTPUT,       0},
 	{GPIO_GPIO1_INPUT,       GPIO_GPIO1_OUTPUT,       0},
 	{GPIO_GPIO2_INPUT,       GPIO_GPIO2_OUTPUT,       0},
@@ -371,6 +388,43 @@ const PX4FMU::GPIOConfig PX4FMU::_gpio_tab[] = {
 	{GPIO_GPI12_INPUT,       GPIO_GPI12_OUTPUT,       0},
 	{GPIO_GPI13_INPUT,       GPIO_GPI13_OUTPUT,       0},
 	{GPIO_GPI14_INPUT,       GPIO_GPI14_OUTPUT,       0},
+    {GPIO_GPI15_INPUT,       GPIO_GPI15_OUTPUT,       0},
+#endif
+#if defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
+    {GPIO_GPIO0_INPUT,       GPIO_GPIO0_OUTPUT,       0},
+    {GPIO_GPIO1_INPUT,       GPIO_GPIO1_OUTPUT,       0},
+    {GPIO_GPIO2_INPUT,       GPIO_GPIO2_OUTPUT,       0},
+    {GPIO_GPIO3_INPUT,       GPIO_GPIO3_OUTPUT,       0},
+    {GPIO_GPIO4_INPUT,       GPIO_GPIO4_OUTPUT,       0},
+    {GPIO_GPIO5_INPUT,       GPIO_GPIO5_OUTPUT,       0},
+    {GPIO_GPIO6_INPUT,       GPIO_GPIO6_OUTPUT,       0},
+    {GPIO_GPIO7_INPUT,       GPIO_GPIO7_OUTPUT,       0},
+    {GPIO_GPIO8_INPUT,       GPIO_GPIO8_OUTPUT,       0},
+    {GPIO_GPIO9_INPUT,       GPIO_GPIO9_OUTPUT,       0},
+    {GPIO_GPI10_INPUT,       GPIO_GPI10_OUTPUT,       0},
+    {GPIO_GPI11_INPUT,       GPIO_GPI11_OUTPUT,       0},
+    {GPIO_GPI12_INPUT,       GPIO_GPI12_OUTPUT,       0},
+    {GPIO_GPI13_INPUT,       GPIO_GPI13_OUTPUT,       0},
+    {GPIO_GPI14_INPUT,       GPIO_GPI14_OUTPUT,       0},
+    {0,       0,       0},
+#endif
+#if defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+    {GPIO_GPIO0_INPUT,       GPIO_GPIO0_OUTPUT,       0},
+    {GPIO_GPIO1_INPUT,       GPIO_GPIO1_OUTPUT,       0},
+    {GPIO_GPIO2_INPUT,       GPIO_GPIO2_OUTPUT,       0},
+    {GPIO_GPIO3_INPUT,       GPIO_GPIO3_OUTPUT,       0},
+    {GPIO_GPIO4_INPUT,       GPIO_GPIO4_OUTPUT,       0},
+    {GPIO_GPIO5_INPUT,       GPIO_GPIO5_OUTPUT,       0},
+    {GPIO_GPIO6_INPUT,       GPIO_GPIO6_OUTPUT,       0},
+    {GPIO_GPIO7_INPUT,       GPIO_GPIO7_OUTPUT,       0},
+    {GPIO_GPIO8_INPUT,       GPIO_GPIO8_OUTPUT,       0},
+    {GPIO_GPIO9_INPUT,       GPIO_GPIO9_OUTPUT,       0},
+    {GPIO_GPI10_INPUT,       GPIO_GPI10_OUTPUT,       0},
+    {0,       0,       0},
+    {GPIO_GPI12_INPUT,       GPIO_GPI12_OUTPUT,       0},
+    {GPIO_GPI13_INPUT,       GPIO_GPI13_OUTPUT,       0},
+    {GPIO_GPI14_INPUT,       GPIO_GPI14_OUTPUT,       0},
+    {0,       0,       0},
 #endif
 };
 
@@ -421,6 +475,7 @@ PX4FMU::PX4FMU() :
 	_num_failsafe_set(0),
 	_num_disarmed_set(0),
 	_safety_off(false),
+	_safety_options(0),
 	_safety_disabled(false),
 	_to_safety(nullptr),
 	_oneshot_mode(false),
@@ -494,14 +549,15 @@ PX4FMU::init()
 		return ret;
 	}
 
-	/* try to claim the generic PWM output device node as well - it's OK if we fail at this */
-	_class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
+    /* try to claim the generic PWM output device node as well - it's OK if we fail at this */
+    _class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
-		/* lets not be too verbose */
-	} else if (_class_instance < 0) {
-		warnx("FAILED registering class device");
-	}
+    if (_class_instance == CLASS_DEVICE_PRIMARY) {
+        /* lets not be too verbose */
+    } else if (_class_instance < 0) {
+        warnx("FAILED registering class device");
+        
+    }
 
 	_safety_disabled = circuit_breaker_enabled("CBRK_IO_SAFETY", CBRK_IO_SAFETY_KEY);
 
@@ -531,7 +587,9 @@ PX4FMU:: safety_check_button(void)
 	 */
 	if (safety_button_pressed && !_safety_off) {
 
-		if (counter < CYCLE_COUNT) {
+		if ((_safety_options & PWM_SERVO_SET_SAFETY_OPTION_DISABLE_BUTTON_OFF)) {
+			// do nothing
+		} else if (counter < CYCLE_COUNT) {
 			counter++;
 
 		} else if (counter == CYCLE_COUNT) {
@@ -542,7 +600,9 @@ PX4FMU:: safety_check_button(void)
 
 	} else if (safety_button_pressed && _safety_off) {
 
-		if (counter < CYCLE_COUNT) {
+		if ((_safety_options & PWM_SERVO_SET_SAFETY_OPTION_DISABLE_BUTTON_ON)) {
+			// do nothing
+		} else if (counter < CYCLE_COUNT) {
 			counter++;
 
 		} else if (counter == CYCLE_COUNT) {
@@ -604,8 +664,8 @@ PX4FMU::set_mode(Mode mode)
 		up_input_capture_set(2, Rising, 0, NULL, NULL);
 		up_input_capture_set(3, Rising, 0, NULL, NULL);
 		DEVICE_DEBUG("MODE_2PWM2CAP");
-
-	// no break
+		//
+	// fall through
 	case MODE_2PWM:	// v1 multi-port with flow control lines as PWM
 		DEVICE_DEBUG("MODE_2PWM");
 		_pwm_mask = 0x3;
@@ -617,7 +677,7 @@ PX4FMU::set_mode(Mode mode)
 		DEVICE_DEBUG("MODE_3PWM1CAP");
 		up_input_capture_set(3, Rising, 0, NULL, NULL);
 
-	// no break
+	// fall through
 	case MODE_3PWM:	// v1 multi-port with flow control lines as PWM
 		DEVICE_DEBUG("MODE_3PWM");
 
@@ -639,7 +699,7 @@ PX4FMU::set_mode(Mode mode)
 		_pwm_initialized = false;
 		break;
 
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case MODE_8PWM: // AeroCore PWMs as 8 PWM outs
 		DEVICE_DEBUG("MODE_8PWM");
@@ -648,7 +708,7 @@ PX4FMU::set_mode(Mode mode)
 		break;
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case MODE_10PWM:
 		DEVICE_DEBUG("MODE_10PWM");
@@ -928,10 +988,12 @@ void PX4FMU::rc_io_invert(bool invert)
 {
 	INVERT_RC_INPUT(invert);
 
+#ifdef GPIO_RC_OUT
 	if (!invert) {
 		// set FMU_RC_OUTPUT high to pull RC_INPUT up
 		stm32_gpiowrite(GPIO_RC_OUT, 1);
 	}
+#endif
 }
 #endif
 
@@ -995,7 +1057,9 @@ PX4FMU::cycle()
 		// assume SBUS input
 		sbus_config(_rcs_fd, false);
 		// disable CPPM input by mapping it away from the timer capture input
+#ifdef GPIO_PPM_IN
 		stm32_unconfiggpio(GPIO_PPM_IN);
+#endif
 #endif
 
 		_initialized = true;
@@ -1626,10 +1690,10 @@ PX4FMU::ioctl(file *filp, int cmd, unsigned long arg)
 	case MODE_2PWM2CAP:
 	case MODE_3PWM1CAP:
 	case MODE_6PWM:
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 	case MODE_8PWM:
 #endif
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 	case MODE_10PWM:
 	case MODE_12PWM:
 #endif
@@ -1678,6 +1742,12 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 		update_pwm_out_state();
 		break;
 
+	case PWM_SERVO_SET_SAFETY_OPTIONS: {
+		// control safety switch options
+		_safety_options = (arg & (PWM_SERVO_SET_SAFETY_OPTION_DISABLE_BUTTON_ON|PWM_SERVO_SET_SAFETY_OPTION_DISABLE_BUTTON_OFF));
+		break;
+	}
+		
 	case PWM_SERVO_DISARM:
 		_servos_armed = false;
 		update_pwm_out_state();
@@ -1687,6 +1757,10 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 		*(uint32_t *)arg = _pwm_default_rate;
 		break;
 
+	case PWM_SERVO_SET_DEFAULT_UPDATE_RATE:
+		ret = set_pwm_rate(_pwm_alt_rate_channels, (uint32_t)arg, _pwm_alt_rate);
+		break;
+        
 	case PWM_SERVO_SET_UPDATE_RATE:
 		ret = set_pwm_rate(_pwm_alt_rate_channels, _pwm_default_rate, arg);
 		break;
@@ -1881,7 +1955,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 			break;
 		}
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case PWM_SERVO_SET(11):
 	case PWM_SERVO_SET(10):
@@ -1899,7 +1973,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case PWM_SERVO_SET(7):
 	case PWM_SERVO_SET(6):
@@ -1943,7 +2017,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 
 		break;
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case PWM_SERVO_GET(11):
 	case PWM_SERVO_GET(10):
@@ -1961,7 +2035,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	case PWM_SERVO_GET(7):
 	case PWM_SERVO_GET(6):
@@ -2005,11 +2079,11 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	case PWM_SERVO_GET_RATEGROUP(3):
 	case PWM_SERVO_GET_RATEGROUP(4):
 	case PWM_SERVO_GET_RATEGROUP(5):
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 	case PWM_SERVO_GET_RATEGROUP(6):
 	case PWM_SERVO_GET_RATEGROUP(7):
 #endif
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 	case PWM_SERVO_GET_RATEGROUP(8):
 	case PWM_SERVO_GET_RATEGROUP(9):
 	case PWM_SERVO_GET_RATEGROUP(10):
@@ -2022,7 +2096,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	case MIXERIOCGETOUTPUTCOUNT:
 		switch (_mode) {
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 		case MODE_12PWM:
 			*(unsigned *)arg = 12;
@@ -2033,7 +2107,7 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 			break;
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 		case MODE_8PWM:
 			*(unsigned *)arg = 8;
@@ -2090,22 +2164,22 @@ PX4FMU::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 				set_mode(MODE_4PWM);
 				break;
 
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) ||  defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) ||  defined(CONFIG_ARCH_BOARD_PX4FMU_V4) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO) \
+	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 			case 6:
 				set_mode(MODE_6PWM);
 				break;
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_AEROCORE) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 			case 8:
 				set_mode(MODE_8PWM);
 				break;
 #endif
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 			case 10:
 				set_mode(MODE_10PWM);
@@ -2313,7 +2387,7 @@ PX4FMU::write(file *filp, const char *buffer, size_t len)
 	unsigned count = len / 2;
 	uint16_t values[12];
 
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 
 	if (count > 12) {
 		// we have at most 12 outputs
@@ -2551,6 +2625,77 @@ PX4FMU::sensor_reset(int ms)
 #endif
 #endif
 
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
+
+	if (ms < 1) {
+		ms = 1;
+	}
+
+/* disable SPI bus */
+	stm32_configgpio(GPIO_SPI_CS_OFF_MPU9250);
+	stm32_configgpio(GPIO_SPI_CS_OFF_LIS3MDL);
+	stm32_configgpio(GPIO_SPI_CS_OFF_MS5611);
+	stm32_configgpio(GPIO_SPI_CS_OFF_ICM_2060X);
+	stm32_configgpio(GPIO_SPI_CS_TEMPCAL_EEPROM);
+
+	stm32_gpiowrite(GPIO_SPI_CS_OFF_MPU9250, 0);
+	stm32_gpiowrite(GPIO_SPI_CS_OFF_LIS3MDL, 0);
+	stm32_gpiowrite(GPIO_SPI_CS_OFF_MS5611, 0);
+	stm32_gpiowrite(GPIO_SPI_CS_OFF_ICM_2060X, 0);
+	stm32_gpiowrite(GPIO_SPI_CS_TEMPCAL_EEPROM, 0);
+
+	stm32_configgpio(GPIO_SPI1_SCK_OFF);
+	stm32_configgpio(GPIO_SPI1_MISO_OFF);
+	stm32_configgpio(GPIO_SPI1_MOSI_OFF);
+
+	stm32_gpiowrite(GPIO_SPI1_SCK_OFF, 0);
+	stm32_gpiowrite(GPIO_SPI1_MISO_OFF, 0);
+	stm32_gpiowrite(GPIO_SPI1_MOSI_OFF, 0);
+
+	stm32_configgpio(GPIO_DRDY_OFF_MPU9250);
+	stm32_configgpio(GPIO_DRDY_OFF_LIS3MDL);
+	stm32_configgpio(GPIO_DRDY_OFF_ICM_2060X);
+
+	stm32_gpiowrite(GPIO_DRDY_OFF_MPU9250, 0);
+	stm32_gpiowrite(GPIO_DRDY_OFF_LIS3MDL, 0);
+	stm32_gpiowrite(GPIO_DRDY_OFF_ICM_2060X, 0);
+
+	/* set the sensor rail off */
+	stm32_configgpio(GPIO_VDD_3V3_SENSORS_EN);
+	stm32_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 0);
+
+	/* wait for the sensor rail to reach GND */
+	usleep(ms * 1000);
+	warnx("reset done, %d ms", ms);
+
+	/* re-enable power */
+
+	/* switch the sensor rail back on */
+	stm32_gpiowrite(GPIO_VDD_3V3_SENSORS_EN, 1);
+
+	/* wait a bit before starting SPI, different times didn't influence results */
+	usleep(100);
+
+	/* reconfigure the SPI pins */
+#ifdef CONFIG_STM32_SPI1
+	stm32_configgpio(GPIO_SPI_CS_MPU9250);
+	stm32_configgpio(GPIO_SPI_CS_LIS3MDL);
+	stm32_configgpio(GPIO_SPI_CS_MS5611);
+	stm32_configgpio(GPIO_SPI_CS_ICM_2060X);
+	stm32_configgpio(GPIO_SPI_CS_TEMPCAL_EEPROM);
+
+	stm32_configgpio(GPIO_SPI1_SCK);
+	stm32_configgpio(GPIO_SPI1_MISO);
+	stm32_configgpio(GPIO_SPI1_MOSI);
+
+	/* bring up the EXTI pins again */
+	stm32_configgpio(GPIO_DRDY_MPU9250);
+	stm32_configgpio(GPIO_DRDY_LIS3MDL);
+	stm32_configgpio(GPIO_DRDY_ICM_2060X);
+
+#endif
+#endif
+
 #if  defined(CONFIG_ARCH_BOARD_MINDPX_V2)
 
 	if (ms < 1) {
@@ -2638,7 +2783,7 @@ PX4FMU::sensor_reset(int ms)
 void
 PX4FMU::peripheral_reset(int ms)
 {
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2)
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
 
 	if (ms < 1) {
 		ms = 10;
@@ -2694,6 +2839,11 @@ PX4FMU::peripheral_reset(int ms)
 void
 PX4FMU::gpio_reset(void)
 {
+#if defined(CONFIG_ARCH_BOARD_AEROFC_V1)
+	// _ngpio == 0, triggering a compile error with -Werror=type-limits
+	return;
+#else
+
 	/*
 	 * Setup default GPIO config - all pins as GPIOs, input if
 	 * possible otherwise output if possible.
@@ -2712,11 +2862,16 @@ PX4FMU::gpio_reset(void)
 	stm32_gpiowrite(GPIO_GPIO_DIR, 0);
 	stm32_configgpio(GPIO_GPIO_DIR);
 #endif
+#endif
 }
 
 void
 PX4FMU::gpio_set_function(uint32_t gpios, int function)
 {
+#if defined(CONFIG_ARCH_BOARD_AEROFC_V1)
+	// _ngpio == 0, triggering a compile error with -Werror=type-limits
+	return;
+#else
 #if defined(CONFIG_ARCH_BOARD_PX4FMU_V1)
 
 	/*
@@ -2774,22 +2929,34 @@ PX4FMU::gpio_set_function(uint32_t gpios, int function)
 	}
 
 #endif
+#endif
 }
 
 void
 PX4FMU::gpio_write(uint32_t gpios, int function)
 {
+#if defined(CONFIG_ARCH_BOARD_AEROFC_V1)
+	// _ngpio == 0, triggering a compile error with -Werror=type-limits
+	return;
+#else
+
 	int value = (function == GPIO_SET) ? 1 : 0;
 
 	for (unsigned i = 0; i < _ngpio; i++)
 		if (gpios & (1 << i)) {
 			stm32_gpiowrite(_gpio_tab[i].output, value);
 		}
+#endif
 }
 
 uint32_t
 PX4FMU::gpio_read(void)
 {
+#if defined(CONFIG_ARCH_BOARD_AEROFC_V1)
+	// _ngpio == 0, triggering a compile error with -Werror=type-limits
+	return 0;
+#else
+
 	uint32_t bits = 0;
 
 	for (unsigned i = 0; i < _ngpio; i++)
@@ -2798,6 +2965,7 @@ PX4FMU::gpio_read(void)
 		}
 
 	return bits;
+#endif
 }
 
 int
@@ -3084,19 +3252,19 @@ fmu_new_mode(PortMode new_mode)
 		servo_mode = PX4FMU::MODE_4PWM;
 #endif
 #if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) ||  defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	||  defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+	||  defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
 		servo_mode = PX4FMU::MODE_6PWM;
 #endif
 #if defined(CONFIG_ARCH_BOARD_AEROCORE)
 		servo_mode = PX4FMU::MODE_8PWM;
 #endif
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 		servo_mode = PX4FMU::MODE_12PWM;
 #endif
 		break;
 
 #if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) ||  defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
 
 	case PORT_PWM4:
 		/* select 4-pin PWM mode */
@@ -3526,11 +3694,14 @@ fmu_main(int argc, char *argv[])
 	if (!strcmp(verb, "mode_gpio")) {
 		new_mode = PORT_FULL_GPIO;
 
+	} else if (!strcmp(verb, "mode_rcin")) {
+		exit(0);
+
 	} else if (!strcmp(verb, "mode_pwm")) {
 		new_mode = PORT_FULL_PWM;
 
 #if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) ||  defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	||  defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+	||  defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
 
 	} else if (!strcmp(verb, "mode_pwm4")) {
 		new_mode = PORT_PWM4;
@@ -3631,10 +3802,12 @@ fmu_main(int argc, char *argv[])
 	fprintf(stderr,
 		"  mode_gpio, mode_serial, mode_pwm, mode_gpio_serial, mode_pwm_serial, mode_pwm_gpio, test, fake, sensor_reset, id\n");
 #elif defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4) || defined(CONFIG_ARCH_BOARD_AEROCORE) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
 	fprintf(stderr, "  mode_gpio, mode_pwm, mode_pwm4, test, sensor_reset [milliseconds], i2c <bus> <hz>\n");
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52E) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V54) || defined(CONFIG_ARCH_BOARD_VRCORE_V10) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
 	fprintf(stderr, "  mode_gpio, mode_pwm, test\n");
+#elif defined(CONFIG_ARCH_BOARD_AEROFC_V1)
+	fprintf(stderr, "  mode_rcin, test\n");
 #endif
 	exit(1);
 }

@@ -55,6 +55,10 @@
 #define	HW_ARCH "PX4FMU_V4"
 #endif
 
+#ifdef CONFIG_ARCH_BOARD_PX4FMU_V4PRO
+#define	HW_ARCH "PX4FMU_V4PRO"
+#endif
+
 #ifdef CONFIG_ARCH_BOARD_AEROCORE
 #define	HW_ARCH "AEROCORE"
 #endif
@@ -87,6 +91,10 @@
 #define HW_ARCH "VRBRAIN_V52"
 #endif
 
+#ifdef CONFIG_ARCH_BOARD_VRBRAIN_V52E
+#define HW_ARCH "VRBRAIN_V52E"
+#endif
+
 #ifdef CONFIG_ARCH_BOARD_VRBRAIN_V54
 #define HW_ARCH "VRBRAIN_V54"
 #endif
@@ -101,6 +109,10 @@
 
 #ifdef CONFIG_ARCH_BOARD_VRCORE_V10
 #define HW_ARCH "VRCORE_V10"
+#endif
+
+#ifdef CONFIG_ARCH_BOARD_AEROFC_V1
+#define HW_ARCH "AEROFC_V1"
 #endif
 
 #endif /* VERSION_H_ */
